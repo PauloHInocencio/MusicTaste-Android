@@ -14,4 +14,6 @@ public class Utilities {
         NetworkInfo netInfo = cm.getActiveNetworkInfo();
         return netInfo!= null && netInfo.isConnected();
     }
+
+
 }
