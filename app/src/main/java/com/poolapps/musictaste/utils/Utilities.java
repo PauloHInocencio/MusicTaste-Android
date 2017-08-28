@@ -1,4 +1,4 @@
-package com.poolapps.musictaste;
+package com.poolapps.musictaste.utils;
 
 
 import android.content.Context;

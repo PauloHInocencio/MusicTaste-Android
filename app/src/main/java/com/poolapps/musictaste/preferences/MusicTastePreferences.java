@@ -1,4 +1,4 @@
-package com.poolapps.musictaste;
+package com.poolapps.musictaste.preferences;
 
 
 import android.content.Context;

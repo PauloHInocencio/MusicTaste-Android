@@ -1,7 +1,9 @@
-package com.poolapps.musictaste;
+package com.poolapps.musictaste.server;
 
 import android.net.Uri;
 import android.util.Log;
+
+import com.poolapps.musictaste.model.MusicItem;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -99,9 +101,11 @@ public class ItunesFetchr {
         JSONArray resultsJsonArray = jsonBody.getJSONArray("results");
 
         for (int i = 0; i < resultsJsonArray.length(); i++){
-
             MusicItem item = MusicItem.create(resultsJsonArray.getJSONObject(i));
-            items.add(item);
+            if (item != null) {
+                items.add(item);
+            }
+
         }
     }
 

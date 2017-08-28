@@ -10,4 +10,14 @@
     <color name="monsoon">#777777</color>
     <color name="red_alert">#F34336</color>
     <color name="cool_green">#66BF65</color>
+
+
+    <color name="album_name">#666666</color>
+    <color name="music_gender">#888888</color>
+
+    <color name="list_row_start_color">#ffffff</color>
+    <color name="list_row_end_color">#ffffff</color>
+    <color name="list_row_hover_start_color">#ebeef0</color>
+    <color name="list_row_hover_end_color">#ebeef0</color>
+
 </resources>

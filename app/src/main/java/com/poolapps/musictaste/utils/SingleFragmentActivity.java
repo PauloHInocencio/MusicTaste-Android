@@ -1,17 +1,19 @@
-package com.poolapps.musictaste;
+package com.poolapps.musictaste.utils;
 
-import android.content.Intent;
 import android.os.Bundle;
 import android.support.annotation.LayoutRes;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v7.app.AppCompatActivity;
-import android.util.Log;
+
+import com.poolapps.musictaste.R;
 
 
 public abstract class SingleFragmentActivity extends AppCompatActivity {
 
+
     protected abstract Fragment createFragment();
+
 
     @LayoutRes
     protected int getLayoutResId(){
@@ -25,19 +27,13 @@ public abstract class SingleFragmentActivity extends AppCompatActivity {
 
         FragmentManager fm = getSupportFragmentManager();
         Fragment fragment = fm.findFragmentById(R.id.fragment_container);
-
         if (fragment == null){
             fragment = createFragment();
             fm.beginTransaction()
                     .add(R.id.fragment_container, fragment)
                     .commit();
         }
-    }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        Log.d("SingleFragmentActivity", "onActivityResult");
-        super.onActivityResult(requestCode, resultCode, data);
     }
 
 }

@@ -112,14 +112,11 @@
                     android:layout_width="match_parent"
                     android:layout_height="200dp"
                     android:layout_marginTop="20dp"
+                    android:scaleType="fitCenter"
                     android:layout_below="@+id/album_name_container"/>
 
 
-
-
-
                 <!-- Buttons Container -->
-
                 <RelativeLayout
                     android:id="@+id/buttons_container"
                     android:layout_width="wrap_content"
@@ -167,6 +164,7 @@
                             android:textSize="12sp"
                             android:textColor="@color/monsoon"
                             android:text="Gosto"/>
+
 
                         <ImageButton
                             android:id="@+id/like_button"
@@ -216,15 +214,5 @@
         android:layout_gravity="center"
         android:layout_centerInParent="true"
         android:progressDrawable="@drawable/circular_progress_bar" />
-
-
-
-
-
-    <!--<android.support.v7.widget.RecyclerView
-        android:id="@+id/products_recycler_view"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent" />-->
-
 
 </RelativeLayout>

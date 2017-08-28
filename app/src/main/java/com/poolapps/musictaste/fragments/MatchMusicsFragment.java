@@ -1,9 +1,15 @@
-package com.poolapps.musictaste;
+package com.poolapps.musictaste.fragments;
 
+import android.database.Cursor;
+import android.graphics.Bitmap;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Handler;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
+import android.support.v4.app.LoaderManager;
+import android.support.v4.content.CursorLoader;
+import android.support.v4.content.Loader;
 import android.support.v7.widget.CardView;
 import android.support.v7.widget.SearchView;
 import android.view.LayoutInflater;
@@ -13,22 +19,37 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import com.poolapps.musictaste.R;
+import com.poolapps.musictaste.database.MusicContract;
+import com.poolapps.musictaste.database.MusicsController;
+import com.poolapps.musictaste.model.MusicItem;
+import com.poolapps.musictaste.preferences.MusicTastePreferences;
+import com.poolapps.musictaste.server.ImageLoader;
+import com.poolapps.musictaste.server.ItunesFetchr;
+import com.poolapps.musictaste.utils.Utilities;
+
+import java.util.ArrayList;
 import java.util.List;
 
 
 
 
-public class MatchMusicsFragment extends Fragment {
+public class MatchMusicsFragment extends Fragment implements LoaderManager.LoaderCallbacks<Cursor> {
     private static final String TAG = ItunesFetchr.class.getSimpleName();
 
-    //private RecyclerView mRecyclerView;
+    private static final String STATE_CURRENT_MUSIC_ITEM = "current_item";
+    private static final int LOADER_CURRENT_ITEMS_TO_MATCH = 1;
 
 
-    private List<MusicItem> mMusicItems;
+    private ArrayList<MusicItem> mMusicItems;
+    private MusicItem mCurrentItem;
+
     private CardView mMusicInfoCardView;
     private LinearLayout mDefaultMessageContainer;
     private ProgressBar mSpinner;
@@ -36,6 +57,10 @@ public class MatchMusicsFragment extends Fragment {
     private TextView mArtistName;
     private TextView mMusicName;
     private TextView mAlbumName;
+    private ImageView mAlbumImage;
+
+    private ImageLoader<ImageView> mImageLoader;
+
 
     public static MatchMusicsFragment newInstance() {
         return new MatchMusicsFragment();
@@ -45,22 +70,40 @@ public class MatchMusicsFragment extends Fragment {
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setHasOptionsMenu(true);
+
+        Handler responseHandler = new Handler();
+        mImageLoader = new ImageLoader<>(responseHandler);
+        mImageLoader.setImageLoaderListener(new ImageLoader.ImageLoaderListener<ImageView>() {
+            @Override
+            public void imageHasBeenDownloaded(ImageView targetWaitingForBitmap, Bitmap bitmapDownloaded) {
+                if (targetWaitingForBitmap != null) {
+                    hideSpinner();
+                    showCardView();
+                    targetWaitingForBitmap.setImageBitmap(bitmapDownloaded);
+                }
+            }
+
+            @Override
+            public void imageWasNotDownloaded(ImageView targetWaitingForBitmap, String errorMessage) {
+                Toast.makeText(getContext(), "Erro: " + errorMessage, Toast.LENGTH_SHORT).show();
+            }
+        });
+        mImageLoader.start();
+        mImageLoader.getLooper();
     }
+
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        outState.putParcelable(STATE_CURRENT_MUSIC_ITEM, mCurrentItem);
+        super.onSaveInstanceState(outState);
+    }
+
+
 
     @Nullable
     @Override
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View v = inflater.inflate(R.layout.match_fragment, container, false);
-
-        /*
-        mRecyclerView = (RecyclerView) v.findViewById(R.id.products_recycler_view);
-        mRecyclerView.setLayoutManager(new LinearLayoutManager(getActivity()));
-        mRecyclerView.setItemAnimator(new DefaultItemAnimator());
-        mRecyclerView.setAdapter(new MusicAdapter(new ArrayList<MusicItem>()));
-        RecyclerView.ItemDecoration itemDecoration = new DividerItemDecoration(getActivity(), DividerItemDecoration.VERTICAL);
-        mRecyclerView.addItemDecoration(itemDecoration);
-
-       */
 
         mMusicInfoCardView = (CardView) v.findViewById(R.id.music_information_cardview);
         mDefaultMessageContainer = (LinearLayout) v.findViewById(R.id.default_message_container);
@@ -70,15 +113,19 @@ public class MatchMusicsFragment extends Fragment {
         mMusicName = (TextView) v.findViewById(R.id.music_name_text);
         mArtistName = (TextView) v.findViewById(R.id.artist_name_text);
         mAlbumName = (TextView) v.findViewById(R.id.album_name_text);
+        mAlbumImage = (ImageView) v.findViewById(R.id.album_image);
+
+
 
         ImageButton likeButton = (ImageButton) v.findViewById(R.id.like_button);
         likeButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                MusicsController.addMusic(getContext(), mCurrentItem);
+                Toast.makeText(getContext(), "Salva em Gostei.", Toast.LENGTH_SHORT).show();
                 showNextMusic();
             }
         });
-
 
         ImageButton dislikeButton = (ImageButton) v.findViewById(R.id.dislike_button);
         dislikeButton.setOnClickListener(new View.OnClickListener() {
@@ -88,6 +135,11 @@ public class MatchMusicsFragment extends Fragment {
             }
         });
 
+        if (savedInstanceState != null) {
+            mCurrentItem = savedInstanceState.getParcelable(STATE_CURRENT_MUSIC_ITEM);
+            fillViews(mCurrentItem);
+        }
+
 
         return v;
     }
@@ -95,7 +147,16 @@ public class MatchMusicsFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        checkInternetConnectionBeforeSearch();
+        getActivity()
+                .getSupportLoaderManager()
+                .restartLoader(LOADER_CURRENT_ITEMS_TO_MATCH, null, this);
+        /*if (mMusicItems == null) {
+            checkInternetConnectionBeforeSearch();
+        } else {
+            if (mMusicItems.size() == 0 && mCurrentItem == null) {
+                hideCardView("Sem resultados para essa pesquisa.");
+            }
+        }*/
     }
 
 
@@ -129,10 +190,70 @@ public class MatchMusicsFragment extends Fragment {
                 searchView.setQuery(query, false);
             }
         });
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        mImageLoader.quit();
+        mImageLoader.clearQueueOfWaitingTargets();
+    }
 
 
+
+
+    @Override
+    public Loader<Cursor> onCreateLoader(int id, Bundle args) {
+        Loader<Cursor> loader = null;
+        switch (id) {
+            case LOADER_CURRENT_ITEMS_TO_MATCH:
+                String selection = MusicContract.Music.COLUMN_IS_ON_LIKED + " = ? ";
+                String[] selectionArgs = new String[]{"0"};
+                loader = new CursorLoader(getContext(),
+                        MusicContract.Music.CONTENT_URI,
+                        null,
+                        selection,
+                        selectionArgs,
+                        null);
+                break;
+        }
+
+        return loader;
+    }
+
+    @Override
+    public void onLoadFinished(Loader<Cursor> loader, Cursor cursor) {
+        mMusicItems= new ArrayList<>();
+        hideSpinner();
+        if (cursor != null){
+            while (cursor.moveToNext()){
+                MusicItem item = MusicItem.create(cursor);
+                mMusicItems.add(item);
+            }
+            cursor.close();
+        }
+
+        if (mMusicItems.size() > 0){
+            mCurrentItem = mMusicItems.remove(0);
+            fillViews(mCurrentItem);
+
+            for (MusicItem item : mMusicItems)  {
+                mImageLoader.getBitmapFromWeb(item.albumImageUrl);
+            }
+            //((MusicAdapter) mRecyclerView.getAdapter()).swapList(items);
+            //showRecycler();
+        } else {
+            //hideRecycler();
+            checkInternetConnectionBeforeSearch();
+        }
+    }
+
+    @Override
+    public void onLoaderReset(Loader<Cursor> loader) {
 
     }
+
+
 
     private void updateSearch(){
         String query = MusicTastePreferences.getSearchQuery(getContext());
@@ -147,15 +268,22 @@ public class MatchMusicsFragment extends Fragment {
     private void showNextMusic() {
         if (mMusicItems.size() > 0) {
             showCardView();
-            MusicItem item = mMusicItems.remove(0);
-            mMusicName.setText(item.musicName);
-            mArtistName.setText(item.artistName);
-            mAlbumName.setText(item.albumName);
+            mCurrentItem  = mMusicItems.remove(0);
+            fillViews(mCurrentItem);
+
         } else {
-            checkInternetConnectionBeforeSearch();
+            mCurrentItem = null;
+            hideCardView("Sem resultados para essa pesquisa.");
         }
     }
 
+    private void fillViews(MusicItem item) {
+        mMusicName.setText(item.musicName);
+        mArtistName.setText(item.artistName);
+        mAlbumName.setText(item.albumName);
+        mAlbumImage.setImageResource(R.drawable.placeholder);
+        mImageLoader.getBitmapFromWeb(mAlbumImage, item.albumImageUrl);
+    }
 
     private void checkInternetConnectionBeforeSearch() {
         boolean isConnected = Utilities.checkInternetConnection(getContext());
@@ -188,67 +316,6 @@ public class MatchMusicsFragment extends Fragment {
         mSpinner.setVisibility(View.GONE);
     }
 
-
-    /*private class MusicAdapter extends RecyclerView.Adapter<MusicHolder> {
-
-        private List<MusicItem> items = new ArrayList<>();
-
-        MusicAdapter(List<MusicItem> musicItems) {
-            items = musicItems;
-        }
-
-        @Override
-        public MusicHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-            LayoutInflater li = LayoutInflater.from(getActivity());
-            View v = li.inflate(R.layout.match_fragment_list_item, parent, false);
-            return new MusicHolder(v);
-        }
-
-        @Override
-        public void onBindViewHolder(MusicHolder holder, int position) {
-            holder.bindItem(items.get(position));
-        }
-
-        @Override
-        public int getItemCount() {
-            return  items.size();
-        }
-
-
-        void swapList(List<MusicItem> musicItems) {
-            items = musicItems;
-            notifyDataSetChanged();
-        }
-    }
-
-
-    private class MusicHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
-        private MusicItem mItem;
-        private TextView mMusicName;
-        private TextView mArtistName;
-
-        MusicHolder(View v) {
-            super(v);
-            v.setOnClickListener(this);
-            mMusicName = (TextView) v.findViewById(R.id.music_name);
-            mArtistName = (TextView) v.findViewById(R.id.artist_name);
-        }
-
-        void bindItem(MusicItem item) {
-            mItem = item;
-            mMusicName.setText(item.name);
-            mArtistName.setText(item.artistName);
-        }
-
-        @Override
-        public void onClick(View view) {
-            //Intent intent = ProductDetailActivity.newIntent(getContext(), mProduct.id, getAdapterPosition());
-            //startActivityForResult(intent, 0);
-        }
-    } */
-
-
-
     private class FetchMusicsTask extends AsyncTask<Void, Void, List<MusicItem>> {
 
         String mMusicName;
@@ -264,10 +331,14 @@ public class MatchMusicsFragment extends Fragment {
 
         @Override
         protected void onPostExecute(List<MusicItem> musicItems) {
-            mMusicItems = musicItems;
-            hideSpinner();
-            showNextMusic();
-            //((MusicAdapter) mRecyclerView.getAdapter()).swapList(musicItems);
+            mMusicItems = (ArrayList<MusicItem>) musicItems;
+            mCurrentItem = mMusicItems.remove(0);
+            fillViews(mCurrentItem);
+
+            for (MusicItem item : mMusicItems)  {
+                mImageLoader.getBitmapFromWeb(item.albumImageUrl);
+            }
+
         }
     }
 

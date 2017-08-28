@@ -1,4 +1,4 @@
-package com.poolapps.musictaste;
+package com.poolapps.musictaste.fragments;
 
 import android.os.Bundle;
 import android.support.annotation.NonNull;
@@ -13,10 +13,13 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 
+import com.poolapps.musictaste.R;
+
 public class MainFragment extends Fragment {
+    private static final String STATE_CURRENT_FRAGMENT = "current_fragment";
 
     private BottomNavigationView mNavigation;
-
+    private Fragment mCurrentFragment;
 
     public static MainFragment newInstance() {
         return new MainFragment();
@@ -27,13 +30,6 @@ public class MainFragment extends Fragment {
         super.onCreate(savedInstanceState);
         //setHasOptionsMenu(true);
     }
-
-    /*@Override
-    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
-        inflater.inflate(R.menu.main_menu, menu);
-        super.onCreateOptionsMenu(menu, inflater);
-    }*/
-
 
 
     @Nullable
@@ -53,33 +49,48 @@ public class MainFragment extends Fragment {
         mNavigation.setOnNavigationItemSelectedListener(new BottomNavigationView.OnNavigationItemSelectedListener() {
             @Override
             public boolean onNavigationItemSelected(@NonNull MenuItem item) {
-                Fragment fragment = null;
+                //Fragment fragment = null;
                 String title = "";
                 switch (item.getItemId()){
                     case R.id.action_match:
                         title = "Match";
-                        fragment = MatchMusicsFragment.newInstance();
+                        mCurrentFragment = MatchMusicsFragment.newInstance();
                         break;
 
                     case R.id.action_liked:
                         title = "Liked";
-                        fragment = LikedMusicsFragment.newInstance();
+                        mCurrentFragment = LikedMusicsFragment.newInstance();
                         break;
                 }
 
                 ((AppCompatActivity) getActivity()).getSupportActionBar().setTitle(title);
 
                 FragmentTransaction transaction = getChildFragmentManager().beginTransaction();
-                transaction.replace(R.id.home_fragment_container, fragment);
+                transaction.replace(R.id.home_fragment_container, mCurrentFragment);
                 transaction.commit();
                 return true;
             }
         });
 
+        if (savedInstanceState != null) {
+            mCurrentFragment = getChildFragmentManager().getFragment(savedInstanceState, STATE_CURRENT_FRAGMENT);
+        } else {
+            mCurrentFragment = MatchMusicsFragment.newInstance();
+        }
+
+
         FragmentTransaction transaction = getChildFragmentManager().beginTransaction();
-        transaction.replace(R.id.home_fragment_container, MatchMusicsFragment.newInstance());
+        transaction.replace(R.id.home_fragment_container, mCurrentFragment);
         transaction.commit();
 
         return v;
     }
+
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        getChildFragmentManager().putFragment(outState, STATE_CURRENT_FRAGMENT, mCurrentFragment);
+    }
 }
+
+
