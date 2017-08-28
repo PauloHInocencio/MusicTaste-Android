@@ -2,6 +2,7 @@ package com.poolapps.musictaste.fragments;
 
 import android.database.Cursor;
 import android.graphics.Bitmap;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
@@ -38,14 +39,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 
-
-
 public class MatchMusicsFragment extends Fragment implements LoaderManager.LoaderCallbacks<Cursor> {
     private static final String TAG = ItunesFetchr.class.getSimpleName();
 
     private static final String STATE_CURRENT_MUSIC_ITEM = "current_item";
     private static final int LOADER_CURRENT_ITEMS_TO_MATCH = 1;
-
 
     private ArrayList<MusicItem> mMusicItems;
     private MusicItem mCurrentItem;
@@ -60,7 +58,6 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
     private ImageView mAlbumImage;
 
     private ImageLoader<ImageView> mImageLoader;
-
 
     public static MatchMusicsFragment newInstance() {
         return new MatchMusicsFragment();
@@ -85,11 +82,13 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
 
             @Override
             public void imageWasNotDownloaded(ImageView targetWaitingForBitmap, String errorMessage) {
-                Toast.makeText(getContext(), "Erro: " + errorMessage, Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), "Error: " + errorMessage, Toast.LENGTH_SHORT).show();
             }
+
         });
         mImageLoader.start();
         mImageLoader.getLooper();
+
     }
 
     @Override
@@ -115,15 +114,17 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
         mAlbumName = (TextView) v.findViewById(R.id.album_name_text);
         mAlbumImage = (ImageView) v.findViewById(R.id.album_image);
 
-
-
         ImageButton likeButton = (ImageButton) v.findViewById(R.id.like_button);
         likeButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                MusicsController.addMusic(getContext(), mCurrentItem);
-                Toast.makeText(getContext(), "Salva em Gostei.", Toast.LENGTH_SHORT).show();
-                showNextMusic();
+                Uri uri = mImageLoader.saveBitmapOnPhone(mCurrentItem.albumImageUrl);
+                if (uri != null) {
+                    mCurrentItem.albumImageUri = uri.toString();
+                    mCurrentItem.isOnLiked = true;
+                    MusicsController.updateMusic(getActivity(), mCurrentItem);
+                    showNextMusic();
+                }
             }
         });
 
@@ -131,6 +132,7 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
         dislikeButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                MusicsController.deleteMusic(getActivity(), mCurrentItem);
                 showNextMusic();
             }
         });
@@ -139,7 +141,6 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
             mCurrentItem = savedInstanceState.getParcelable(STATE_CURRENT_MUSIC_ITEM);
             fillViews(mCurrentItem);
         }
-
 
         return v;
     }
@@ -150,13 +151,6 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
         getActivity()
                 .getSupportLoaderManager()
                 .restartLoader(LOADER_CURRENT_ITEMS_TO_MATCH, null, this);
-        /*if (mMusicItems == null) {
-            checkInternetConnectionBeforeSearch();
-        } else {
-            if (mMusicItems.size() == 0 && mCurrentItem == null) {
-                hideCardView("Sem resultados para essa pesquisa.");
-            }
-        }*/
     }
 
 
@@ -200,8 +194,6 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
     }
 
 
-
-
     @Override
     public Loader<Cursor> onCreateLoader(int id, Bundle args) {
         Loader<Cursor> loader = null;
@@ -240,10 +232,7 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
             for (MusicItem item : mMusicItems)  {
                 mImageLoader.getBitmapFromWeb(item.albumImageUrl);
             }
-            //((MusicAdapter) mRecyclerView.getAdapter()).swapList(items);
-            //showRecycler();
         } else {
-            //hideRecycler();
             checkInternetConnectionBeforeSearch();
         }
     }
@@ -252,7 +241,6 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
     public void onLoaderReset(Loader<Cursor> loader) {
 
     }
-
 
 
     private void updateSearch(){
@@ -267,9 +255,9 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
 
     private void showNextMusic() {
         if (mMusicItems.size() > 0) {
-            showCardView();
             mCurrentItem  = mMusicItems.remove(0);
             fillViews(mCurrentItem);
+            showCardView();
 
         } else {
             mCurrentItem = null;
@@ -331,14 +319,23 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
 
         @Override
         protected void onPostExecute(List<MusicItem> musicItems) {
-            mMusicItems = (ArrayList<MusicItem>) musicItems;
-            mCurrentItem = mMusicItems.remove(0);
-            fillViews(mCurrentItem);
 
-            for (MusicItem item : mMusicItems)  {
-                mImageLoader.getBitmapFromWeb(item.albumImageUrl);
+            if (musicItems.size() > 0) {
+                for (MusicItem item : musicItems)  {
+                    MusicsController.insertMusic(getContext(), item);
+                    mImageLoader.getBitmapFromWeb(item.albumImageUrl);
+                }
+
+                getActivity()
+                        .getSupportLoaderManager()
+                        .restartLoader(LOADER_CURRENT_ITEMS_TO_MATCH, null, MatchMusicsFragment.this);
+
+            } else {
+
+                hideSpinner();
+                hideCardView("Verifique sua conexão com a internet.");
+
             }
-
         }
     }
 

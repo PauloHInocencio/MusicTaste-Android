@@ -1,22 +1,33 @@
 package com.poolapps.musictaste.fragments;
 
+import android.Manifest;
+import android.content.DialogInterface;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.design.widget.BottomNavigationView;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentTransaction;
+import android.support.v4.content.ContextCompat;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Toast;
 
 import com.poolapps.musictaste.R;
 
 public class MainFragment extends Fragment {
+
+
+    private final static int CODE_REQUEST_EXTERNAL_STORAGE_PERMISSION = 0;
     private static final String STATE_CURRENT_FRAGMENT = "current_fragment";
+
 
     private BottomNavigationView mNavigation;
     private Fragment mCurrentFragment;
@@ -28,7 +39,7 @@ public class MainFragment extends Fragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        //setHasOptionsMenu(true);
+        checkReadExternalStoragePermission();
     }
 
 
@@ -90,6 +101,57 @@ public class MainFragment extends Fragment {
     public void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
         getChildFragmentManager().putFragment(outState, STATE_CURRENT_FRAGMENT, mCurrentFragment);
+    }
+
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        switch (requestCode) {
+            case CODE_REQUEST_EXTERNAL_STORAGE_PERMISSION:
+                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    Toast.makeText(getContext(), "Ready to store images.", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(getContext(),
+                            "Permission to store images was denied", Toast.LENGTH_SHORT).show();
+                }
+                break;
+            default:
+                super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        }
+    }
+
+    private void checkReadExternalStoragePermission() {
+
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
+            if (ContextCompat.checkSelfPermission(getActivity(), Manifest.permission.READ_EXTERNAL_STORAGE)
+                    != PackageManager.PERMISSION_GRANTED) {
+
+                if (!shouldShowRequestPermissionRationale(Manifest.permission.READ_EXTERNAL_STORAGE)) {
+                    showMessageOKCancel("O app armazena imagens dos albúns curtidos localmente." +
+                                    " Necessário permitir acesso de armazenamento externo.",
+                            new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialogInterface, int i) {
+                                    requestPermissions(new String[] {Manifest.permission.READ_EXTERNAL_STORAGE},
+                                            CODE_REQUEST_EXTERNAL_STORAGE_PERMISSION);
+                                }
+                            });
+                    return;
+                }
+
+                requestPermissions(new String[] {Manifest.permission.READ_EXTERNAL_STORAGE},
+                        CODE_REQUEST_EXTERNAL_STORAGE_PERMISSION);
+            }
+        }
+    }
+
+    private void showMessageOKCancel(String message, DialogInterface.OnClickListener okListener) {
+        new AlertDialog.Builder(getContext())
+                .setMessage(message)
+                .setPositiveButton("OK", okListener)
+                .setNegativeButton("Cancel", null)
+                .create()
+                .show();
     }
 }
 

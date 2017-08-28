@@ -11,39 +11,25 @@ import com.poolapps.musictaste.model.MusicItem;
 public class MusicsController {
 
     private static final String ACTION_CREATE = "create";
-    private static final String ACTION_READ = "read";
     private static final String ACTION_UPDATE = "update";
     private static final String ACTION_DELETE = "delete";
 
-    private static MusicControllerListener sListener;
 
-    public interface MusicControllerListener {
-        void onResultOfTheOperation(boolean result);
+    public static void insertMusic(Context context, MusicItem item) {
+        new CRUDTask(item, MusicContract.Music.CONTENT_URI, ACTION_CREATE).execute(context);
     }
 
-    public static void setListener(MusicControllerListener listener){
-        sListener = listener;
-    }
-
-    public static void addMusic(Context c, MusicItem item) {
-        new CRUDTask(item, MusicContract.Music.CONTENT_URI, ACTION_CREATE).execute(c);
-    }
-
-    public static void updateMusic(Context c, MusicItem item) {
+    public static void updateMusic(Context context, MusicItem item) {
         Uri uri = ContentUris.withAppendedId(MusicContract.Music.CONTENT_URI, item.id);
-        new CRUDTask(item, uri, ACTION_UPDATE).execute(c);
+        new CRUDTask(item, uri, ACTION_UPDATE).execute(context);
     }
 
-    public static void deleteMusic(Context c, MusicItem item){
+    public static void deleteMusic(Context context, MusicItem item){
         Uri uri = ContentUris.withAppendedId(MusicContract.Music.CONTENT_URI, item.id);
-        new CRUDTask(item, uri, ACTION_DELETE).execute(c);
+        new CRUDTask(item, uri, ACTION_DELETE).execute(context);
     }
 
-    public static void checkIfItemAlreadyExist(MusicItem item) {
-        String selection = MusicContract.Music.COLUMN_WEB_ID + " = ?";
-        String[] selectionArg = new String[]{item.webId.toString()};
-        new CRUDTask(MusicContract.Music.CONTENT_URI, ACTION_READ, selection, selectionArg);
-    }
+
 
     public static void deleteAllDisliked() {
         String selection = MusicContract.Music.COLUMN_IS_ON_LIKED + " = ?";
@@ -51,13 +37,13 @@ public class MusicsController {
         new CRUDTask(MusicContract.Music.CONTENT_URI, ACTION_DELETE, selection, selectionArgs);
     }
 
-    private static class CRUDTask extends AsyncTask<Context, Void, Boolean> {
+    private static class CRUDTask extends AsyncTask<Context, Void, Void> {
 
         private MusicItem mMusicItem;
-        private Uri mUri;
-        private String mAction;
-        private String mSelection;
-        private String[] mSelectionArgs;
+        private Uri mUri = null;
+        private String mAction = null;
+        private String mSelection = null;
+        private String[] mSelectionArgs = null;
 
         CRUDTask(MusicItem item, Uri uri, String action) {
             mMusicItem = item;
@@ -73,67 +59,56 @@ public class MusicsController {
 
 
         @Override
-        protected Boolean doInBackground(Context... contexts) {
+        protected Void doInBackground(Context... contexts) {
             Context c = contexts[0];
-            int count;
+
 
             if (mMusicItem != null) {
                 switch (mAction) {
                     case ACTION_CREATE:
-                        return insertItem(c);
+                        if (!alreadyExist(c)) {
+                            c.getContentResolver().insert(mUri, mMusicItem.toValues());
+                        }
+                        break;
 
                     case ACTION_UPDATE:
-                        count = c.getContentResolver().update(mUri, mMusicItem.toValues(), null, null);
-                        return count > 0;
+                        if (alreadyExist(c)){
+                            c.getContentResolver().update(mUri, mMusicItem.toValues(), null, null);
+                        }
+                        break;
 
                     case ACTION_DELETE:
-                        count = c.getContentResolver().delete(mUri, null, null);
-                        return count > 0;
+                        c.getContentResolver().delete(mUri, mSelection, mSelectionArgs);
+                        break;
 
-                    default:
-                        return false;
-                }
-            }
-            else if (mSelection != null && mSelectionArgs != null) {
-                switch (mAction) {
-                    case ACTION_DELETE :
-                        count = c.getContentResolver()
-                                .delete(mUri, mSelection, mSelectionArgs);
-                        return count > 0;
-
-                    case ACTION_READ:
-                        return read(c);
-
-                    default:
-                        return false;
                 }
             }
 
-            return false;
+            return null;
         }
 
-        @Override
-        protected void onPostExecute(Boolean result) {
-            sListener.onResultOfTheOperation(result);
-        }
 
-        private boolean insertItem(Context context) {
-           Uri uri = context.getContentResolver().insert(mUri, mMusicItem.toValues());
-           return (uri != null && !uri.getLastPathSegment().equals("-1") ) ;
-        }
 
-        private boolean read(Context context) {
-            boolean canRead = false;
-            Cursor cursor = context
-                    .getContentResolver()
-                    .query(mUri, null, mSelection, mSelectionArgs, null);
 
-            if (cursor != null) {
-                canRead = cursor.getCount() > 0;
-                cursor.close();
+        private boolean alreadyExist(Context context) {
+            boolean exist = false;
+            if (mMusicItem != null) {
+                String selection = MusicContract.Music.COLUMN_WEB_ID + " = ?";
+                String[] selectionArgs = new String[]{mMusicItem.webId.toString()};
+
+                Cursor cursor = context
+                        .getContentResolver()
+                        .query(MusicContract.Music.CONTENT_URI, null, selection, selectionArgs, null);
+
+                if (cursor != null) {
+                    exist = cursor.getCount() > 0;
+                    cursor.close();
+                }
             }
-            return canRead;
+            return exist;
         }
+
+
     }
 
 }

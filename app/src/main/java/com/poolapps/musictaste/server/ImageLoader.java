@@ -32,7 +32,6 @@ public class ImageLoader<T> extends HandlerThread  {
     private static final String TAG = ImageLoader.class.getSimpleName();
     private static final String LOCAL_CACHE_DIR_NAME = "MusicTasteAlbums";
     private static final int MESSAGE_GET_IMAGE_FROM_WEB = 0;
-    private static final int MESSAGE_GET_IMAGE_FROM_PHONE = 1;
 
     private Handler mResponseHandler;
     private Handler mRequestHandler;
@@ -96,17 +95,36 @@ public class ImageLoader<T> extends HandlerThread  {
 
     }
 
-    public void getImageFromPhone(String uriOfTheBitmap) {
-
-    }
 
     public void getBitmapFromPhone(T targetWaitingForBitmap, String uriOfTheBitmap) {
 
+        final Bitmap bitmapOnLocalCache = getBitmapFromLocalCache(uriOfTheBitmap);
+        if (bitmapOnLocalCache != null) {
+            mListener.imageHasBeenDownloaded(targetWaitingForBitmap, bitmapOnLocalCache);
+        } else {
+            mListener.imageWasNotDownloaded(targetWaitingForBitmap, "Bitmap não encontrado.");
+        }
+
+    }
+
+
+    public Uri saveBitmapOnPhone(String urlOfTheBitmap) {
+
+        final Bitmap bitmapOnCache = getBitmapFromMemoryCache(urlOfTheBitmap);
+        Uri uri = null;
+        if (bitmapOnCache != null){
+            try {
+                uri = addBitmapToLocalCache(bitmapOnCache);
+            } catch (IOException ioe) {
+                ioe.printStackTrace();
+            }
+        }
+
+        return uri;
     }
 
     public void clearQueueOfWaitingTargets() {
         mRequestHandler.removeMessages(MESSAGE_GET_IMAGE_FROM_WEB);
-        mRequestHandler.removeMessages(MESSAGE_GET_IMAGE_FROM_PHONE);
     }
 
     @Override
@@ -218,28 +236,28 @@ public class ImageLoader<T> extends HandlerThread  {
     }
 
 
-    private Uri addBitmapToLocalCache(Bitmap bitmap) {
+    private Uri addBitmapToLocalCache(Bitmap bitmap) throws IOException {
 
         String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
         File file = new File(mLocalCacheDir.getPath() + File.separator + "ALBUM_IMAGE_" + timeStamp + ".png");
-        Boolean error = false;
 
         FileOutputStream out = null;
+        Uri uri = null;
         try {
             out = new FileOutputStream(file);
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
+            uri = Uri.fromFile(file);
+
         } catch (Exception e){
             e.printStackTrace();
+
         } finally {
-            try {
-                if (out != null){
-                    out.close();
-                }
-            }catch (IOException e) {
-                e.printStackTrace();
+            if (out != null){
+                out.close();
             }
         }
-        return Uri.fromFile(file);
+
+        return uri;
     }
 
     private Bitmap getBitmapFromLocalCache(String imageUri) {

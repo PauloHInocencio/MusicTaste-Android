@@ -16,6 +16,7 @@ import static com.poolapps.musictaste.database.MusicContract.Music.COLUMN_ALBUM_
 import static com.poolapps.musictaste.database.MusicContract.Music.COLUMN_ARTIST_NAME;
 import static com.poolapps.musictaste.database.MusicContract.Music.COLUMN_IS_ON_LIKED;
 import static com.poolapps.musictaste.database.MusicContract.Music.COLUMN_MUSIC_NAME;
+import static com.poolapps.musictaste.database.MusicContract.Music.COLUMN_WEB_ID;
 
 public class MusicItem implements Parcelable {
 
@@ -55,6 +56,7 @@ public class MusicItem implements Parcelable {
 
         MusicItem item = new MusicItem();
         item.id = c.getInt(c.getColumnIndex(_ID));
+        item.webId = c.getInt(c.getColumnIndex(COLUMN_WEB_ID));
         item.musicName = c.getString(c.getColumnIndex(COLUMN_MUSIC_NAME));
         item.artistName = c.getString(c.getColumnIndex(COLUMN_ARTIST_NAME));
         item.albumName = c.getString(c.getColumnIndex(COLUMN_ALBUM_NAME));
@@ -68,6 +70,7 @@ public class MusicItem implements Parcelable {
     public ContentValues toValues() {
         ContentValues values = new ContentValues();
         values.put(_ID, this.id);
+        values.put(COLUMN_WEB_ID, this.webId);
         values.put(COLUMN_MUSIC_NAME, this.musicName);
         values.put(COLUMN_ARTIST_NAME, this.artistName);
         values.put(COLUMN_ALBUM_NAME, this.albumName);
@@ -85,24 +88,28 @@ public class MusicItem implements Parcelable {
 
     @Override
     public void writeToParcel(Parcel dest, int flags) {
-        dest.writeInt(this.id);
+        dest.writeValue(this.id);
+        dest.writeValue(this.webId);
         dest.writeString(this.musicName);
         dest.writeString(this.artistName);
         dest.writeString(this.albumName);
         dest.writeString(this.albumImageUrl);
         dest.writeString(this.albumImageUri);
+        dest.writeByte(this.isOnLiked ? (byte) 1 : (byte) 0);
     }
 
     public MusicItem() {
     }
 
     protected MusicItem(Parcel in) {
-        this.id = in.readInt();
+        this.id = (Integer) in.readValue(Integer.class.getClassLoader());
+        this.webId = (Integer) in.readValue(Integer.class.getClassLoader());
         this.musicName = in.readString();
         this.artistName = in.readString();
         this.albumName = in.readString();
         this.albumImageUrl = in.readString();
         this.albumImageUri = in.readString();
+        this.isOnLiked = in.readByte() != 0;
     }
 
     public static final Parcelable.Creator<MusicItem> CREATOR = new Parcelable.Creator<MusicItem>() {

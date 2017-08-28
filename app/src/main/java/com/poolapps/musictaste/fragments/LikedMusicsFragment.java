@@ -1,7 +1,9 @@
 package com.poolapps.musictaste.fragments;
 
 import android.database.Cursor;
+import android.graphics.Bitmap;
 import android.os.Bundle;
+import android.os.Handler;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.LoaderManager;
@@ -22,6 +24,7 @@ import android.widget.TextView;
 import com.poolapps.musictaste.R;
 import com.poolapps.musictaste.database.MusicContract;
 import com.poolapps.musictaste.model.MusicItem;
+import com.poolapps.musictaste.server.ImageLoader;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,9 +40,36 @@ public class LikedMusicsFragment extends Fragment implements LoaderManager.Loade
     private LinearLayout mDefaultMessageContainer;
     private ProgressBar mSpinner;
 
+    private ImageLoader<MusicHolder> mImageLoader;
 
     public static LikedMusicsFragment newInstance() {
         return new LikedMusicsFragment();
+    }
+
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        Handler responseHandler = new Handler();
+        mImageLoader = new ImageLoader<>(responseHandler);
+        mImageLoader.setImageLoaderListener(new ImageLoader.ImageLoaderListener<MusicHolder>() {
+
+
+            @Override
+            public void imageHasBeenDownloaded(MusicHolder targetWaitingForBitmap, Bitmap bitmapDownloaded) {
+                if(targetWaitingForBitmap != null) {
+                    targetWaitingForBitmap.mAlbumImage.setImageBitmap(bitmapDownloaded);
+                }
+            }
+
+            @Override
+            public void imageWasNotDownloaded(MusicHolder targetWaitingForBitmap, String errorMessage) {
+
+            }
+        });
+        mImageLoader.start();
+        mImageLoader.getLooper();
     }
 
     @Nullable
@@ -78,12 +108,15 @@ public class LikedMusicsFragment extends Fragment implements LoaderManager.Loade
         Loader<Cursor> loader = null;
 
         switch (id){
+
             case LOADER_MUSIC_ITEMS:
+                String selection = MusicContract.Music.COLUMN_IS_ON_LIKED + " = ? ";
+                String[] selectionArg = new String[]{"1"};
                 loader = new CursorLoader(getContext(),
                         MusicContract.Music.CONTENT_URI,
                         null,
-                        null,
-                        null,
+                        selection,
+                        selectionArg,
                         null);
                 break;
         }
@@ -192,8 +225,8 @@ public class LikedMusicsFragment extends Fragment implements LoaderManager.Loade
             mMusicName.setText(mItem.musicName);
             mArtistName.setText(mItem.artistName);
             mAlbumName.setText(mItem.albumName);
-
-
+            mAlbumImage.setImageResource(R.drawable.placeholder);
+            mImageLoader.getBitmapFromPhone(this, mItem.albumImageUri);
         }
 
         @Override

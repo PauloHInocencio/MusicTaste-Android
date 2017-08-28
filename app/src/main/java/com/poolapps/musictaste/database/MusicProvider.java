@@ -58,7 +58,7 @@ public class MusicProvider extends ContentProvider {
                     selection = BaseColumns._ID + " = " + uri.getLastPathSegment();
                 } else {
                     throw new IllegalArgumentException("selection must be null when" +
-                            "specifying ID as part of uri");
+                            " specifying ID as part of uri");
                 }
 
                 cursor = db.query(MusicContract.Music.TABLE_NAME,
