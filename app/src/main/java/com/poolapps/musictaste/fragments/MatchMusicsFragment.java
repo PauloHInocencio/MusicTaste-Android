@@ -13,6 +13,7 @@ import android.support.v4.content.CursorLoader;
 import android.support.v4.content.Loader;
 import android.support.v7.widget.CardView;
 import android.support.v7.widget.SearchView;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -24,7 +25,6 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.poolapps.musictaste.R;
 import com.poolapps.musictaste.database.MusicContract;
@@ -83,7 +83,8 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
 
             @Override
             public void imageWasNotDownloaded(ImageView targetWaitingForBitmap, String errorMessage) {
-                Toast.makeText(getContext(), "Error: " + errorMessage, Toast.LENGTH_SHORT).show();
+                //Toast.makeText(getContext(), "Error: " + errorMessage, Toast.LENGTH_SHORT).show();
+                Log.d(TAG, errorMessage);
             }
 
         });
@@ -94,7 +95,7 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
 
     @Override
     public void onSaveInstanceState(Bundle outState) {
-        outState.putParcelable(STATE_CURRENT_MUSIC_ITEM, mCurrentItem);
+        //utState.putParcelable(STATE_CURRENT_MUSIC_ITEM, mCurrentItem);
         super.onSaveInstanceState(outState);
     }
 
@@ -124,8 +125,14 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
                 if (uri != null) {
                     mCurrentItem.albumImageUri = uri.toString();
                     mCurrentItem.isOnLiked = true;
-                    MusicsController.updateMusic(getActivity(), mCurrentItem);
-                    showNextMusic();
+                    MusicsController.updateMusic(getActivity(), mCurrentItem, new MusicsController.Callback() {
+                        @Override
+                        public void finishOperation(String action, int totalOperations) {
+                            Log.d(TAG, "Action: " + action + " Total Operations: " + totalOperations);
+                            showNextMusic();
+                        }
+                    });
+
                 }
             }
         });
@@ -134,18 +141,24 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
         dislikeButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                MusicsController.deleteMusic(getActivity(), mCurrentItem);
-                showNextMusic();
+                MusicsController.deleteMusic(getActivity(), mCurrentItem, new MusicsController.Callback() {
+                    @Override
+                    public void finishOperation(String action, int totalOperations) {
+                        Log.d(TAG, "Action: " + action + " Total Operations: " + totalOperations);
+                        showNextMusic();
+                    }
+                });
+
             }
         });
 
-        if (savedInstanceState != null) {
+        /*if (savedInstanceState != null) {
             mCurrentItem = savedInstanceState.getParcelable(STATE_CURRENT_MUSIC_ITEM);
             if (mCurrentItem != null) {
-                fillViews(mCurrentItem);
+                fillViews();
             }
 
-        }
+        }*/
 
         return v;
     }
@@ -171,7 +184,10 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
             public boolean onQueryTextSubmit(String query) {
-                MusicsController.deleteAllDisliked(getContext());
+                if (!query.equals(MusicTastePreferences.getSearchQuery(getContext())) ){
+                    MusicsController.deleteAllDisliked(getContext());
+                }
+
                 MusicTastePreferences.setSearchQuery(getContext(), query);
                 checkInternetConnectionBeforeSearch();
                 searchView.clearFocus();
@@ -217,6 +233,7 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
     @Override
     public void onLoadFinished(Loader<Cursor> loader, Cursor cursor) {
         mMusicItems= new ArrayList<>();
+        String message = "";
         if (cursor != null){
             while (cursor.moveToNext()){
                 MusicItem item = MusicItem.create(cursor);
@@ -225,24 +242,40 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
             cursor.close();
         }
 
-        if (mMusicItems.size() > 0){
-            mCurrentItem = mMusicItems.remove(0);
-            fillViews(mCurrentItem);
+        if (Utilities.checkInternetConnection(getContext())) {
 
-            for (MusicItem item : mMusicItems)  {
-                mImageLoader.getBitmapFromWeb(item.albumImageUrl);
+            if (mMusicItems.size() > 0){
+                mCurrentItem = mMusicItems.remove(0);
+                fillViews();
+                loadImages();
+                return;
+
+            } else {
+                message = "Sem resultados para essa pesquisa.";
             }
-        } else if (loader.getId() == LOADER_AFTER_CHECK_ON_WEB) {
-            checkInternetConnectionBeforeSearch();
+
+            if (loader.getId() == LOADER_BEFORE_CHECK_ON_WEB) {
+                checkInternetConnectionBeforeSearch();
+                return;
+            }
+
         } else {
-            hideSpinner();
-            hideCardView("Sem resultados para essa pesquisa.");
+            message = "Verifique sua conexão com a internet.";
         }
+
+        hideSpinner();
+        hideCardView(message);
     }
 
     @Override
     public void onLoaderReset(Loader<Cursor> loader) {
 
+    }
+
+    private void loadImages () {
+        for (MusicItem item : mMusicItems)  {
+            mImageLoader.getBitmapFromWeb(item.albumImageUrl);
+        }
     }
 
 
@@ -252,6 +285,7 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
             showSpinner();
             new FetchMusicsTask(query).execute();
         } else {
+            hideSpinner();
             hideCardView("Pesquise por alguma música.");
         }
     }
@@ -259,21 +293,20 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
     private void showNextMusic() {
         if (mMusicItems.size() > 0) {
             mCurrentItem  = mMusicItems.remove(0);
-            fillViews(mCurrentItem);
+            fillViews();
             showCardView();
 
         } else {
-            mCurrentItem = null;
             hideCardView("Sem resultados para essa pesquisa.");
         }
     }
 
-    private void fillViews(MusicItem item) {
-        mMusicName.setText(item.musicName);
-        mArtistName.setText(item.artistName);
-        mAlbumName.setText(item.albumName);
+    private void fillViews() {
+        mMusicName.setText(mCurrentItem.musicName);
+        mArtistName.setText(mCurrentItem.artistName);
+        mAlbumName.setText(mCurrentItem.albumName);
         mAlbumImage.setImageResource(R.drawable.placeholder);
-        mImageLoader.getBitmapFromWeb(mAlbumImage, item.albumImageUrl);
+        mImageLoader.getBitmapFromWeb(mAlbumImage, mCurrentItem.albumImageUrl);
     }
 
     private void checkInternetConnectionBeforeSearch() {
@@ -310,7 +343,6 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
     private class FetchMusicsTask extends AsyncTask<Void, Void, List<MusicItem>> {
 
         String mMusicName;
-
         FetchMusicsTask(String musicName) {
             mMusicName = musicName;
         }
@@ -324,19 +356,21 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
         protected void onPostExecute(List<MusicItem> musicItems) {
 
             if (musicItems.size() > 0) {
-                for (MusicItem item : musicItems)  {
-                    MusicsController.insertMusic(getContext(), item);
-                    mImageLoader.getBitmapFromWeb(item.albumImageUrl);
-                }
 
-                getActivity()
-                        .getSupportLoaderManager()
-                        .restartLoader(LOADER_AFTER_CHECK_ON_WEB, null, MatchMusicsFragment.this);
+                MusicsController.insertMusic(getContext(), musicItems, new MusicsController.Callback() {
+                    @Override
+                    public void finishOperation(String action, int totalOperations) {
+                        Log.d(TAG, "Action: " + action + " Total Operations: " + totalOperations);
+                        loadImages();
+                        getActivity()
+                                .getSupportLoaderManager()
+                                .restartLoader(LOADER_AFTER_CHECK_ON_WEB, null, MatchMusicsFragment.this);
+                    }
+                });
 
             } else {
-
                 hideSpinner();
-                hideCardView("Verifique sua conexão com a internet.");
+                hideCardView("Sem resultados para essa pesquisa.");
 
             }
         }
