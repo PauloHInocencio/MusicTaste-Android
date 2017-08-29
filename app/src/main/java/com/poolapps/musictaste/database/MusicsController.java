@@ -31,10 +31,10 @@ public class MusicsController {
 
 
 
-    public static void deleteAllDisliked() {
+    public static void deleteAllDisliked(Context context) {
         String selection = MusicContract.Music.COLUMN_IS_ON_LIKED + " = ?";
         String[] selectionArgs = new String[]{"0"};
-        new CRUDTask(MusicContract.Music.CONTENT_URI, ACTION_DELETE, selection, selectionArgs);
+        new CRUDTask(MusicContract.Music.CONTENT_URI, ACTION_DELETE, selection, selectionArgs).execute(context);
     }
 
     private static class CRUDTask extends AsyncTask<Context, Void, Void> {
@@ -61,28 +61,26 @@ public class MusicsController {
         @Override
         protected Void doInBackground(Context... contexts) {
             Context c = contexts[0];
+            switch (mAction) {
+                case ACTION_CREATE:
 
+                    if (mMusicItem != null && !alreadyExist(c)) {
+                        c.getContentResolver().insert(mUri, mMusicItem.toValues());
+                    }
+                    break;
 
-            if (mMusicItem != null) {
-                switch (mAction) {
-                    case ACTION_CREATE:
-                        if (!alreadyExist(c)) {
-                            c.getContentResolver().insert(mUri, mMusicItem.toValues());
-                        }
-                        break;
+                case ACTION_UPDATE:
+                    if (mMusicItem != null && alreadyExist(c)){
+                        c.getContentResolver().update(mUri, mMusicItem.toValues(), null, null);
+                    }
+                    break;
 
-                    case ACTION_UPDATE:
-                        if (alreadyExist(c)){
-                            c.getContentResolver().update(mUri, mMusicItem.toValues(), null, null);
-                        }
-                        break;
+                case ACTION_DELETE:
+                    c.getContentResolver().delete(mUri, mSelection, mSelectionArgs);
+                    break;
 
-                    case ACTION_DELETE:
-                        c.getContentResolver().delete(mUri, mSelection, mSelectionArgs);
-                        break;
-
-                }
             }
+
 
             return null;
         }

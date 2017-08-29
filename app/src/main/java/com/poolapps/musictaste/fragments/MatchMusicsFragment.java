@@ -43,7 +43,8 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
     private static final String TAG = ItunesFetchr.class.getSimpleName();
 
     private static final String STATE_CURRENT_MUSIC_ITEM = "current_item";
-    private static final int LOADER_CURRENT_ITEMS_TO_MATCH = 1;
+    private static final int LOADER_BEFORE_CHECK_ON_WEB = 1;
+    private static final int LOADER_AFTER_CHECK_ON_WEB = 2;
 
     private ArrayList<MusicItem> mMusicItems;
     private MusicItem mCurrentItem;
@@ -105,6 +106,7 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
         View v = inflater.inflate(R.layout.match_fragment, container, false);
 
         mMusicInfoCardView = (CardView) v.findViewById(R.id.music_information_cardview);
+        mMusicInfoCardView.setVisibility(View.GONE);
         mDefaultMessageContainer = (LinearLayout) v.findViewById(R.id.default_message_container);
         mSpinner = (ProgressBar) v.findViewById(R.id.progressbar);
         mSpinner.setVisibility(View.GONE);
@@ -139,7 +141,10 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
 
         if (savedInstanceState != null) {
             mCurrentItem = savedInstanceState.getParcelable(STATE_CURRENT_MUSIC_ITEM);
-            fillViews(mCurrentItem);
+            if (mCurrentItem != null) {
+                fillViews(mCurrentItem);
+            }
+
         }
 
         return v;
@@ -148,9 +153,10 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
     @Override
     public void onResume() {
         super.onResume();
+        showSpinner();
         getActivity()
                 .getSupportLoaderManager()
-                .restartLoader(LOADER_CURRENT_ITEMS_TO_MATCH, null, this);
+                .restartLoader(LOADER_BEFORE_CHECK_ON_WEB, null, this);
     }
 
 
@@ -165,6 +171,7 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
             public boolean onQueryTextSubmit(String query) {
+                MusicsController.deleteAllDisliked(getContext());
                 MusicTastePreferences.setSearchQuery(getContext(), query);
                 checkInternetConnectionBeforeSearch();
                 searchView.clearFocus();
@@ -184,6 +191,7 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
                 searchView.setQuery(query, false);
             }
         });
+
     }
 
     @Override
@@ -196,27 +204,19 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
 
     @Override
     public Loader<Cursor> onCreateLoader(int id, Bundle args) {
-        Loader<Cursor> loader = null;
-        switch (id) {
-            case LOADER_CURRENT_ITEMS_TO_MATCH:
-                String selection = MusicContract.Music.COLUMN_IS_ON_LIKED + " = ? ";
-                String[] selectionArgs = new String[]{"0"};
-                loader = new CursorLoader(getContext(),
+        String selection = MusicContract.Music.COLUMN_IS_ON_LIKED + " = ? ";
+        String[] selectionArgs = new String[]{"0"};
+        return new CursorLoader(getContext(),
                         MusicContract.Music.CONTENT_URI,
                         null,
                         selection,
                         selectionArgs,
                         null);
-                break;
-        }
-
-        return loader;
     }
 
     @Override
     public void onLoadFinished(Loader<Cursor> loader, Cursor cursor) {
         mMusicItems= new ArrayList<>();
-        hideSpinner();
         if (cursor != null){
             while (cursor.moveToNext()){
                 MusicItem item = MusicItem.create(cursor);
@@ -232,8 +232,11 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
             for (MusicItem item : mMusicItems)  {
                 mImageLoader.getBitmapFromWeb(item.albumImageUrl);
             }
-        } else {
+        } else if (loader.getId() == LOADER_AFTER_CHECK_ON_WEB) {
             checkInternetConnectionBeforeSearch();
+        } else {
+            hideSpinner();
+            hideCardView("Sem resultados para essa pesquisa.");
         }
     }
 
@@ -328,7 +331,7 @@ public class MatchMusicsFragment extends Fragment implements LoaderManager.Loade
 
                 getActivity()
                         .getSupportLoaderManager()
-                        .restartLoader(LOADER_CURRENT_ITEMS_TO_MATCH, null, MatchMusicsFragment.this);
+                        .restartLoader(LOADER_AFTER_CHECK_ON_WEB, null, MatchMusicsFragment.this);
 
             } else {
 
