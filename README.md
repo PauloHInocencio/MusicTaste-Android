@@ -4,7 +4,7 @@
 
 ## Video Walkthrough
 
-<img src='https://github.com/PauloHInocencio/PhotoGallery/blob/master/musictaste_walkthrough.gif' title='Video Walkthrough' width='' alt='Video Walkthrough' />
+<img src='https://github.com/PauloHInocencio/MusicTaste-Android/blob/master/musictaste_walkthrough.gif' title='Video Walkthrough' width='' alt='Video Walkthrough' />
 
  GIF created with [LiceCap](http://www.cockos.com/licecap/).
 
